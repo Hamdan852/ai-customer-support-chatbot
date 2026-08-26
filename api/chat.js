@@ -1,88 +1,78 @@
-const MAX_MESSAGES = 20;
-const MAX_CHARS_PER_MESSAGE = 4000;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method not allowed.' });
+  }
 
-function json(data, status = 200) {
-  return Response.json(data, {
-    status,
-    headers: { "Cache-Control": "no-store" },
-  });
-}
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'AI backend is not configured yet. Add OPENAI_API_KEY in Vercel Environment Variables.'
+    });
+  }
 
-export async function POST(request) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const messages = Array.isArray(body.messages) ? body.messages : [];
 
-    if (!apiKey) {
-      return json({
-        error: "AI service is not configured yet. Add OPENAI_API_KEY to the Vercel project environment variables.",
-      }, 503);
-    }
-
-    const body = await request.json();
-    const rawMessages = Array.isArray(body?.messages) ? body.messages : [];
-
-    if (rawMessages.length === 0) {
-      return json({ error: "Please provide at least one message." }, 400);
-    }
-
-    const messages = rawMessages
-      .slice(-MAX_MESSAGES)
-      .filter((message) => message && ["user", "assistant"].includes(message.role))
+    const safeMessages = messages
+      .filter(
+        (message) =>
+          message &&
+          (message.role === 'user' || message.role === 'assistant') &&
+          typeof message.content === 'string'
+      )
+      .slice(-20)
       .map((message) => ({
         role: message.role,
-        content: String(message.content || "").slice(0, MAX_CHARS_PER_MESSAGE),
-      }))
-      .filter((message) => message.content.trim());
+        content: message.content.slice(0, 4000)
+      }));
 
-    if (!messages.length) {
-      return json({ error: "The message content is empty." }, 400);
+    if (!safeMessages.length || safeMessages[safeMessages.length - 1].role !== 'user') {
+      return res.status(400).json({ error: 'A user message is required.' });
     }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
-        store: false,
-        instructions: `You are the ModernTech AI Support Assistant.
-
-Your job is to help customers politely and concisely.
-
-Business demo information:
-- Business: ModernTech
-- Support topic examples: shipping, returns, opening hours, and contacting support.
-- This is a portfolio demonstration, so never invent exact prices, delivery times, guarantees, or policies that were not supplied.
-- If the customer asks for information that is not known, clearly say that a human representative can confirm it.
-- Never claim to have completed an order, refund, booking, payment, or account change unless a connected tool actually performed that action.
-- If a customer wants human support, offer to collect their name and contact details.
-- Keep answers helpful and professional.`,
-        input: messages,
-      }),
+        model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+        instructions:
+          'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. If the customer asks about a company policy that is not provided in the conversation, do not invent a policy; say that the information is not available and offer to help with something else.',
+        input: safeMessages,
+        max_output_tokens: 600
+      })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("OpenAI API error", data);
-      return json({ error: "The AI service could not complete the request." }, 502);
+      console.error('OpenAI API error:', data);
+      return res.status(502).json({
+        error: 'The AI service could not complete the request.'
+      });
     }
 
-    const answer = data.output_text?.trim();
+    const answer =
+      data.output_text ||
+      data.output
+        ?.filter((item) => item.type === 'message')
+        ?.flatMap((item) => item.content || [])
+        ?.filter((item) => item.type === 'output_text')
+        ?.map((item) => item.text)
+        ?.join(' ')
+        ?.trim();
 
     if (!answer) {
-      return json({ error: "The AI returned an empty response." }, 502);
+      return res.status(502).json({ error: 'The AI service returned no answer.' });
     }
 
-    return json({ answer });
+    return res.status(200).json({ answer });
   } catch (error) {
-    console.error("Chat function error", error);
-    return json({ error: "Something went wrong while processing the chat." }, 500);
+    console.error('Chat handler error:', error);
+    return res.status(500).json({ error: 'Unable to process the chat request.' });
   }
-}
-
-export function GET() {
-  return json({ status: "ok", service: "ModernTech AI Support API" });
 }
