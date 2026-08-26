@@ -39,7 +39,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+        model: process.env.OPENAI_MODEL || 'gpt-5',
         instructions:
           'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. If the customer asks about a company policy that is not provided in the conversation, do not invent a policy; say that the information is not available and offer to help with something else.',
         input: safeMessages,
