@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ModernTech AI customer support assistant demo">
+  <title>ModernTech AI Support</title>
+  <style>
+    :root{--bg:#f5f7fb;--panel:#fff;--text:#172033;--muted:#667085;--border:#e5e7eb;--brand:#2563eb;--brand-dark:#1d4ed8;--soft:#eef4ff;--shadow:0 24px 70px rgba(16,24,40,.12)}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top,#eaf1ff 0,#f5f7fb 42%,#eef1f6 100%);color:var(--text)}
+    .shell{width:min(1040px,calc(100% - 32px));margin:32px auto}
+    .app{display:grid;grid-template-columns:300px 1fr;min-height:700px;background:var(--panel);border:1px solid rgba(255,255,255,.8);border-radius:28px;overflow:hidden;box-shadow:var(--shadow)}
+    aside{padding:28px;background:#111827;color:#fff;display:flex;flex-direction:column}
+    .brand{display:flex;gap:12px;align-items:center}.logo{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#60a5fa,#2563eb);font-weight:800;font-size:20px}.brand h1{font-size:17px;margin:0}.brand p{font-size:12px;color:#cbd5e1;margin:3px 0 0}
+    .status{display:inline-flex;align-items:center;gap:8px;width:max-content;margin-top:28px;padding:8px 11px;border:1px solid #374151;border-radius:999px;color:#d1fae5;font-size:12px}.dot{width:7px;height:7px;background:#34d399;border-radius:50%}
+    .side-title{margin:30px 0 12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;font-size:11px;font-weight:700}.quick{display:grid;gap:9px}.quick button{border:1px solid #374151;background:#1f2937;color:#e5e7eb;text-align:left;padding:11px 12px;border-radius:11px;cursor:pointer}.quick button:hover{background:#263449}
+    .side-note{margin-top:auto;padding-top:24px;color:#94a3b8;font-size:12px;line-height:1.6}
+    main{display:flex;flex-direction:column;min-width:0}.topbar{padding:22px 26px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}.topbar h2{margin:0;font-size:18px}.topbar p{margin:4px 0 0;color:var(--muted);font-size:12px}.badge{padding:7px 10px;background:var(--soft);color:var(--brand-dark);border-radius:999px;font-size:11px;font-weight:700}
+    .messages{flex:1;padding:26px;overflow:auto;min-height:0}.row{display:flex;margin:0 0 16px}.row.user{justify-content:flex-end}.bubble{max-width:min(78%,620px);padding:13px 15px;border-radius:17px;line-height:1.55;font-size:14px;white-space:pre-wrap}.row.bot .bubble{background:#f2f4f7;border-bottom-left-radius:5px}.row.user .bubble{background:var(--brand);color:#fff;border-bottom-right-radius:5px}
+    .composer{padding:18px 22px;border-top:1px solid var(--border);background:#fff}.input-wrap{display:flex;gap:10px;align-items:center;border:1px solid #d0d5dd;border-radius:16px;padding:7px 7px 7px 14px;box-shadow:0 2px 8px rgba(16,24,40,.04)}.input-wrap:focus-within{border-color:#93c5fd;box-shadow:0 0 0 4px #eff6ff}.input-wrap input{flex:1;border:0;outline:0;font:inherit;font-size:14px;min-width:0}.send{border:0;background:var(--brand);color:#fff;border-radius:11px;padding:11px 17px;font-weight:700;cursor:pointer}.send:hover{background:var(--brand-dark)}.hint{text-align:center;color:#98a2b3;font-size:11px;margin-top:8px}
+    @media(max-width:760px){.shell{width:100%;margin:0}.app{grid-template-columns:1fr;border-radius:0;min-height:100vh}aside{display:none}.topbar{padding:18px}.messages{padding:18px}.composer{padding:14px}.bubble{max-width:88%}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="app" aria-label="ModernTech AI customer support">
+      <aside>
+        <div class="brand"><div class="logo">M</div><div><h1>ModernTech</h1><p>AI Customer Support</p></div></div>
+        <div class="status"><span class="dot"></span> Demo assistant online</div>
+        <div class="side-title">Try a question</div>
+        <div class="quick">
+          <button type="button" data-question="What are your shipping options?">Shipping options</button>
+          <button type="button" data-question="What is your return policy?">Return policy</button>
+          <button type="button" data-question="What are your opening hours?">Opening hours</button>
+          <button type="button" data-question="How can I contact support?">Contact support</button>
+        </div>
+        <div class="side-note">Portfolio demo. The next version will connect this interface to a real AI model and a business knowledge base.</div>
+      </aside>
+      <main>
+        <header class="topbar"><div><h2>AI Support Assistant</h2><p>Fast answers for ModernTech customers</p></div><span class="badge">PORTFOLIO DEMO</span></header>
+        <div class="messages" id="messages" aria-live="polite">
+          <div class="row bot"><div class="bubble">Hi! 👋 I'm the ModernTech AI Support Assistant. Ask me about shipping, returns, opening hours, or contacting support.</div></div>
+        </div>
+        <form class="composer" id="chatForm">
+          <div class="input-wrap"><input id="userInput" autocomplete="off" placeholder="Ask a question..." aria-label="Your question"><button class="send" type="submit">Send</button></div>
+          <div class="hint">Demo mode • No API key is stored in this page</div>
+        </form>
+      </main>
+    </section>
+  </div>
+  <script>
+    const messages=document.getElementById('messages');
+    const input=document.getElementById('userInput');
+    const form=document.getElementById('chatForm');
+    const replies=[
+      [/shipping|delivery/i,'ModernTech currently offers standard and express shipping. In the production version, I will answer with the business\'s exact shipping rates, countries, and delivery times.'],
+      [/return|refund/i,'Our demo policy supports returns for eligible purchases. In the production version, the AI will use the company\'s official return and refund policy as its source of truth.'],
+      [/hour|open|close/i,'ModernTech support is available during business hours. In the production version, these hours will come directly from the client\'s business information.'],
+      [/contact|support|human|agent/i,'I can help collect your name and contact details for a human support agent. The production version can also send the lead to email or a CRM.']
+    ];
+    function addMessage(text,type){const row=document.createElement('div');row.className='row '+type;const bubble=document.createElement('div');bubble.className='bubble';bubble.textContent=text;row.appendChild(bubble);messages.appendChild(row);messages.scrollTop=messages.scrollHeight}
+    function getReply(text){for(const [pattern,reply] of replies){if(pattern.test(text))return reply}return 'Thanks for your question! This portfolio demo is ready for the next stage: connecting a real AI model and the client\'s knowledge base so it can answer questions intelligently.'}
+    function send(text){const value=(text||input.value).trim();if(!value)return;addMessage(value,'user');input.value='';setTimeout(()=>addMessage(getReply(value),'bot'),350)}
+    form.addEventListener('submit',e=>{e.preventDefault();send()});
+    document.querySelectorAll('[data-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.question)));
+  </script>
+</body>
+</html>
