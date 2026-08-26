@@ -5,9 +5,10 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  if (!apiKey || !apiKey.trim()) {
+    console.error('AI configuration error: OPENAI_API_KEY is missing or empty.');
     return res.status(503).json({
-      error: 'AI backend is not configured yet. Add OPENAI_API_KEY in Vercel Environment Variables.'
+      error: 'The AI service is not configured. Please add a valid OPENAI_API_KEY in Vercel.'
     });
   }
 
@@ -32,14 +33,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'A user message is required.' });
     }
 
+    const model = process.env.OPENAI_MODEL || 'gpt-5';
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey.trim()}`
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5',
+        model,
         instructions:
           'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. If the customer asks about a company policy that is not provided in the conversation, do not invent a policy; say that the information is not available and offer to help with something else.',
         input: safeMessages,
@@ -50,7 +53,13 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('OpenAI API error:', data);
+      console.error('OpenAI API request failed:', {
+        status: response.status,
+        errorType: data?.error?.type || 'unknown',
+        errorCode: data?.error?.code || 'unknown',
+        message: data?.error?.message || 'No error message returned',
+        model
+      });
       return res.status(502).json({
         error: 'The AI service could not complete the request.'
       });
@@ -67,12 +76,16 @@ export default async function handler(req, res) {
         ?.trim();
 
     if (!answer) {
+      console.error('OpenAI API returned no text output.', { model });
       return res.status(502).json({ error: 'The AI service returned no answer.' });
     }
 
     return res.status(200).json({ answer });
   } catch (error) {
-    console.error('Chat handler error:', error);
+    console.error('Chat handler exception:', {
+      name: error?.name || 'Error',
+      message: error?.message || 'Unknown error'
+    });
     return res.status(500).json({ error: 'Unable to process the chat request.' });
   }
 }
