@@ -7,51 +7,35 @@ export default async function handler(req, res) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || !apiKey.trim()) {
     console.error('AI configuration error: OPENAI_API_KEY is missing or empty.');
-    return res.status(503).json({
-      error: 'The AI service is not configured. Please add a valid OPENAI_API_KEY in Vercel.'
-    });
+    return res.status(503).json({ error: 'The AI service is not configured.' });
   }
 
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const mode = body.mode === 'real-estate' ? 'real-estate' : 'support';
 
     const safeMessages = messages
-      .filter(
-        (message) =>
-          message &&
-          (message.role === 'user' || message.role === 'assistant') &&
-          typeof message.content === 'string'
-      )
+      .filter((message) => message && (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
       .slice(-20)
-      .map((message) => ({
-        role: message.role,
-        content: message.content.slice(0, 4000)
-      }));
+      .map((message) => ({ role: message.role, content: message.content.slice(0, 4000) }));
 
     if (!safeMessages.length || safeMessages[safeMessages.length - 1].role !== 'user') {
       return res.status(400).json({ error: 'A user message is required.' });
     }
 
-    const model = process.env.OPENAI_MODEL || 'gpt-5';
+    const instructions = mode === 'real-estate'
+      ? 'You are a professional US real-estate website assistant. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Ask for location, budget, property type, bedrooms, and timeframe when useful. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Never recommend or exclude neighborhoods or properties based on race, color, religion, sex, disability, familial status, national origin, or other protected characteristics. Do not steer users. When a question requires a licensed real-estate professional, lender, attorney, or other qualified professional, say so and offer an agent handoff. Keep answers concise and friendly.'
+      : 'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. If the customer asks about a company policy that is not provided in the conversation, do not invent a policy; say that the information is not available and offer to help with something else.';
 
+    const model = process.env.OPENAI_MODEL || 'gpt-5';
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey.trim()}`
-      },
-      body: JSON.stringify({
-        model,
-        instructions:
-          'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. If the customer asks about a company policy that is not provided in the conversation, do not invent a policy; say that the information is not available and offer to help with something else.',
-        input: safeMessages,
-        max_output_tokens: 600
-      })
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` },
+      body: JSON.stringify({ model, instructions, input: safeMessages, max_output_tokens: 600 })
     });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error('OpenAI API request failed:', {
         status: response.status,
@@ -60,21 +44,10 @@ export default async function handler(req, res) {
         message: data?.error?.message || 'No error message returned',
         model
       });
-      return res.status(502).json({
-        error: 'The AI service could not complete the request.'
-      });
+      return res.status(502).json({ error: 'The AI service could not complete the request.' });
     }
 
-    const answer =
-      data.output_text ||
-      data.output
-        ?.filter((item) => item.type === 'message')
-        ?.flatMap((item) => item.content || [])
-        ?.filter((item) => item.type === 'output_text')
-        ?.map((item) => item.text)
-        ?.join(' ')
-        ?.trim();
-
+    const answer = data.output_text || data.output?.filter((item) => item.type === 'message')?.flatMap((item) => item.content || [])?.filter((item) => item.type === 'output_text')?.map((item) => item.text)?.join(' ')?.trim();
     if (!answer) {
       console.error('OpenAI API returned no text output.', { model });
       return res.status(502).json({ error: 'The AI service returned no answer.' });
@@ -82,10 +55,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ answer });
   } catch (error) {
-    console.error('Chat handler exception:', {
-      name: error?.name || 'Error',
-      message: error?.message || 'Unknown error'
-    });
+    console.error('Chat handler exception:', { name: error?.name || 'Error', message: error?.message || 'Unknown error' });
     return res.status(500).json({ error: 'Unable to process the chat request.' });
   }
 }
