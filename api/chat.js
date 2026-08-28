@@ -1,4 +1,4 @@
-import { getBusinessId } from './auth.js';
+import { getPublicBusinessId } from './auth.js';
 import { getBusinessConfig } from './business-store.js';
 
 function localSupportAnswer(message, mode, config) {
@@ -18,11 +18,7 @@ function localSupportAnswer(message, mode, config) {
   if (/thank|thanks/.test(text)) return 'You’re welcome! If you have another question, just ask. 😊';
   return `I can help with common questions for ${business}. Ask me about the business, its services, policies, hours, or how to contact the team.`;
 }
-
-function cleanMessages(messages) {
-  return messages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
-}
-
+function cleanMessages(messages) { return messages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })); }
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed.' }); }
   try {
@@ -30,23 +26,15 @@ export default async function handler(req, res) {
     const messages = cleanMessages(Array.isArray(body.messages) ? body.messages : []);
     const mode = body.mode === 'real-estate' ? 'real-estate' : 'support';
     if (!messages.length || messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'A user message is required.' });
-
-    const businessId = getBusinessId(req) || 'demo-business';
+    const businessId = getPublicBusinessId(req) || 'demo-business';
     const config = await getBusinessConfig(businessId);
     const latest = messages[messages.length - 1].content;
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || !apiKey.trim()) return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
-
     const businessContext = config ? `Approved business information:\nBusiness name: ${config.businessName || ''}\nIndustry: ${config.industry || ''}\nWebsite: ${config.website || ''}\nKnowledge supplied by the business:\n${(config.knowledge || '').slice(0,12000)}` : 'No business-specific information has been configured. Do not invent business facts.';
-    const instructions = mode === 'real-estate'
-      ? `You are a professional website assistant for ${config?.businessName || 'a real-estate business'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}`
-      : `You are the customer-support assistant for ${config?.businessName || 'a business'}. Give concise, friendly, useful answers. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a question, say so and offer human contact/lead handoff. Respond in the same language as the user whenever possible.\n\n${businessContext}`;
-
+    const instructions = mode === 'real-estate' ? `You are a professional website assistant for ${config?.businessName || 'a real-estate business'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}` : `You are the customer-support assistant for ${config?.businessName || 'a business'}. Give concise, friendly, useful answers. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a question, say so and offer human contact/lead handoff. Respond in the same language as the user whenever possible.\n\n${businessContext}`;
     const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` },
-      body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 600 })
-    });
+    const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 600 }) });
     const data = await response.json().catch(() => ({}));
     if (response.ok) {
       const answer = data.output_text || data.output?.filter((x) => x.type === 'message').flatMap((x) => x.content || []).filter((x) => x.type === 'output_text').map((x) => x.text).join(' ').trim();
