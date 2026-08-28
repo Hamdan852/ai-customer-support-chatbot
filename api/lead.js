@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       location: clean(body.location, 150), request: clean(body.request, 1000), preferredContact: clean(body.preferredContact, 40)
     };
     if (!lead.name && !lead.email && !lead.phone) return res.status(400).json({ error: 'Provide at least one contact detail.' });
-    const record = createLead(lead);
+    const record = await createLead(lead);
     console.log('Consent-based lead created', { leadId: record.id, businessId: record.businessId, industry: record.industry });
     return res.status(200).json({ success: true, message: 'Your request has been submitted. The business can follow up using the contact information you provided.', leadId: record.id });
   } catch (error) {
