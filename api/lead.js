@@ -1,4 +1,6 @@
 import { createLead } from './leads-store.js';
+import { getBusinessConfig } from './business-store.js';
+import { notifyNewLead } from './notifications.js';
 
 function clean(value, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -12,14 +14,30 @@ export default async function handler(req, res) {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     if (body.consent !== true) return res.status(400).json({ error: 'Customer consent is required before submitting a lead.' });
+
     const lead = {
       businessId: clean(body.businessId, 100) || 'demo-business',
       industry: clean(body.industry, 80) || 'general',
-      name: clean(body.name, 120), email: clean(body.email, 254), phone: clean(body.phone, 50),
-      location: clean(body.location, 150), request: clean(body.request, 1000), preferredContact: clean(body.preferredContact, 40)
+      name: clean(body.name, 120),
+      email: clean(body.email, 254),
+      phone: clean(body.phone, 50),
+      location: clean(body.location, 150),
+      request: clean(body.request, 1000),
+      preferredContact: clean(body.preferredContact, 40)
     };
+
     if (!lead.name && !lead.email && !lead.phone) return res.status(400).json({ error: 'Provide at least one contact detail.' });
+
     const record = await createLead(lead);
+    const business = await getBusinessConfig(lead.businessId);
+
+    // Notification failure must not make a successfully stored lead disappear.
+    try {
+      await notifyNewLead({ business, lead: record });
+    } catch (notificationError) {
+      console.error('Lead notification failed:', notificationError?.message || 'Unknown error');
+    }
+
     console.log('Consent-based lead created', { leadId: record.id, businessId: record.businessId, industry: record.industry });
     return res.status(200).json({ success: true, message: 'Your request has been submitted. The business can follow up using the contact information you provided.', leadId: record.id });
   } catch (error) {
