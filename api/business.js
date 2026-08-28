@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (!businessId) return;
   if (req.method === 'GET') return res.status(200).json({ businessId, config: await getBusinessConfig(businessId) });
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const config = { businessName: clean(body.businessName, 160), industry: clean(body.industry, 80), website: clean(body.website, 500), contactEmail: clean(body.contactEmail, 254), knowledge: clean(body.knowledge, 12000), notificationEmail: clean(body.notificationEmail || body.contactEmail, 254), notificationPhone: clean(body.notificationPhone, 32), emailNotifications: Boolean(body.emailNotifications), smsNotifications: Boolean(body.smsNotifications), humanHandoff: Boolean(body.humanHandoff) };
+  const config = { businessName: clean(body.businessName, 160), assistantName: clean(body.assistantName, 80), industry: clean(body.industry, 80), website: clean(body.website, 500), contactEmail: clean(body.contactEmail, 254), knowledge: clean(body.knowledge, 12000), notificationEmail: clean(body.notificationEmail || body.contactEmail, 254), notificationPhone: clean(body.notificationPhone, 32), emailNotifications: Boolean(body.emailNotifications), smsNotifications: Boolean(body.smsNotifications), humanHandoff: Boolean(body.humanHandoff) };
   if (!config.businessName) return res.status(400).json({ error: 'Business name is required.' });
   const saved = await saveBusinessConfig(businessId, config);
   return res.status(200).json({ success: true, businessId, config: saved });
