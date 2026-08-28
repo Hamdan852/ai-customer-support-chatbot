@@ -3,7 +3,7 @@
 const memory = globalThis.__HAMDAN_BUSINESS_CONFIGS__ || (globalThis.__HAMDAN_BUSINESS_CONFIGS__ = new Map());
 const users = globalThis.__HAMDAN_USERS__ || (globalThis.__HAMDAN_USERS__ = new Map());
 let schemaReady = null;
-function hasDatabase() { return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING); }
+export function hasDatabase() { return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING); }
 async function getSql() { if (!hasDatabase()) return null; const mod = await import('@vercel/postgres'); return mod.sql; }
 async function ensureSchema() {
   if (!hasDatabase()) return false;
