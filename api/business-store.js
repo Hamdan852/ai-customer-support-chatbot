@@ -10,7 +10,8 @@ async function ensureSchema() {
   if (!schemaReady) {
     schemaReady = (async () => {
       const sql = await getSql();
-      await sql`CREATE TABLE IF NOT EXISTS hamdan_business_configs (business_id TEXT PRIMARY KEY, business_name TEXT NOT NULL, industry TEXT, website TEXT, contact_email TEXT, knowledge TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+      await sql`CREATE TABLE IF NOT EXISTS hamdan_business_configs (business_id TEXT PRIMARY KEY, business_name TEXT NOT NULL, assistant_name TEXT, industry TEXT, website TEXT, contact_email TEXT, knowledge TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
+      await sql`ALTER TABLE hamdan_business_configs ADD COLUMN IF NOT EXISTS assistant_name TEXT`;
       await sql`CREATE TABLE IF NOT EXISTS hamdan_users (email TEXT PRIMARY KEY, password_hash TEXT NOT NULL, business_id TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
       return true;
     })().catch((error) => { schemaReady = null; console.error('Business database unavailable; using memory fallback:', error?.message || 'Unknown error'); return false; });
@@ -18,12 +19,12 @@ async function ensureSchema() {
   return schemaReady;
 }
 export async function getBusinessConfig(businessId) {
-  if (await ensureSchema()) { try { const sql = await getSql(); const { rows } = await sql`SELECT business_id AS "businessId", business_name AS "businessName", industry, website, contact_email AS "contactEmail", knowledge, updated_at AS "updatedAt" FROM hamdan_business_configs WHERE business_id = ${businessId} LIMIT 1`; return rows[0] || null; } catch (error) { console.error('Business database query failed; using memory fallback:', error?.message || 'Unknown error'); } }
+  if (await ensureSchema()) { try { const sql = await getSql(); const { rows } = await sql`SELECT business_id AS "businessId", business_name AS "businessName", assistant_name AS "assistantName", industry, website, contact_email AS "contactEmail", knowledge, updated_at AS "updatedAt" FROM hamdan_business_configs WHERE business_id = ${businessId} LIMIT 1`; return rows[0] || null; } catch (error) { console.error('Business database query failed; using memory fallback:', error?.message || 'Unknown error'); } }
   return memory.get(businessId) || null;
 }
 export async function saveBusinessConfig(businessId, config) {
   const record = { businessId, ...config, updatedAt: new Date().toISOString() };
-  if (await ensureSchema()) { try { const sql = await getSql(); await sql`INSERT INTO hamdan_business_configs (business_id, business_name, industry, website, contact_email, knowledge, updated_at) VALUES (${businessId}, ${config.businessName}, ${config.industry || ''}, ${config.website || ''}, ${config.contactEmail || ''}, ${config.knowledge || ''}, ${record.updatedAt}) ON CONFLICT (business_id) DO UPDATE SET business_name = EXCLUDED.business_name, industry = EXCLUDED.industry, website = EXCLUDED.website, contact_email = EXCLUDED.contact_email, knowledge = EXCLUDED.knowledge, updated_at = EXCLUDED.updated_at`; return record; } catch (error) { console.error('Business database save failed; using memory fallback:', error?.message || 'Unknown error'); } }
+  if (await ensureSchema()) { try { const sql = await getSql(); await sql`INSERT INTO hamdan_business_configs (business_id, business_name, assistant_name, industry, website, contact_email, knowledge, updated_at) VALUES (${businessId}, ${config.businessName}, ${config.assistantName || ''}, ${config.industry || ''}, ${config.website || ''}, ${config.contactEmail || ''}, ${config.knowledge || ''}, ${record.updatedAt}) ON CONFLICT (business_id) DO UPDATE SET business_name = EXCLUDED.business_name, assistant_name = EXCLUDED.assistant_name, industry = EXCLUDED.industry, website = EXCLUDED.website, contact_email = EXCLUDED.contact_email, knowledge = EXCLUDED.knowledge, updated_at = EXCLUDED.updated_at`; return record; } catch (error) { console.error('Business database save failed; using memory fallback:', error?.message || 'Unknown error'); } }
   memory.set(businessId, record); return record;
 }
 export async function findUserByEmail(email) {
