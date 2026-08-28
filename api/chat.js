@@ -32,8 +32,8 @@ export default async function handler(req, res) {
     if (!apiKey || !apiKey.trim()) return res.status(200).json({ answer: localSupportAnswer(latest, mode), provider: 'local-fallback', degraded: true });
 
     const instructions = mode === 'real-estate'
-      ? 'You are a professional US real-estate website assistant. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly.'
-      : 'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. Never invent company policies or facts not supplied by the business.';
+      ? 'You are a professional US real-estate website assistant. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible, preserving names, addresses, prices, and other factual details exactly.'
+      : 'You are the ModernTech AI Support Assistant. Give concise, friendly, useful customer-support answers. Never invent company policies or facts not supplied by the business. Respond in the same language as the user whenever possible.';
 
     const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
     const response = await fetch('https://api.openai.com/v1/responses', {
