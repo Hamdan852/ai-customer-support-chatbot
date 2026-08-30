@@ -3,7 +3,7 @@ import { getBusinessConfig } from './business-store.js';
 import { rejectIfLimited } from './rate-limit.js';
 
 function cleanAssistantName(value, business) {
-  const fallback = 'AI Assistant for your business';
+  const fallback = 'the AI Assistant for your business';
   const name = String(value || '').trim().replace(/\s+/g, ' ');
   if (!name) return fallback;
   if (/^(the\s+)?business\s+(ai|al)(\s+support)?\s+assistant$/i.test(name)) return fallback;
