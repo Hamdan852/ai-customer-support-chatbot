@@ -6,7 +6,8 @@ function cleanAssistantName(value, business) {
   const fallback = `${business || 'the business'} AI Assistant`;
   const name = String(value || '').trim().replace(/\s+/g, ' ');
   if (!name) return fallback;
-  if (/^(the\s+)?business\s+(ai|al)\s+support\s+assistant$/i.test(name)) return fallback;
+  if (/^(the\s+)?business\s+(ai|al)(\s+support)?\s+assistant$/i.test(name)) return fallback;
+  if (/^(the\s+)?ai\s+assistant\s+for\s+(your|the)\s+business$/i.test(name)) return fallback;
   return name.replace(/^the\s+the\s+/i, 'the ');
 }
 
