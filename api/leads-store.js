@@ -1,12 +1,14 @@
 // Lead storage adapter.
-// Uses Vercel Postgres when POSTGRES_URL is configured; otherwise keeps the
-// existing in-memory fallback so the demo remains usable without a database.
-
+// Demo/preview environments may use the in-memory fallback. Production must use persistent storage.
 const memory = globalThis.__HAMDAN_LEADS__ || (globalThis.__HAMDAN_LEADS__ = new Map());
 let schemaReady = null;
 
 function hasDatabase() {
   return Boolean(process.env.POSTGRES_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL_NON_POOLING);
+}
+
+function isProduction() {
+  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
 }
 
 async function getSql() {
@@ -16,7 +18,10 @@ async function getSql() {
 }
 
 async function ensureSchema() {
-  if (!hasDatabase()) return false;
+  if (!hasDatabase()) {
+    if (isProduction()) throw new Error('Persistent database storage is required in production.');
+    return false;
+  }
   if (!schemaReady) {
     schemaReady = (async () => {
       const sql = await getSql();
@@ -36,8 +41,8 @@ async function ensureSchema() {
       return true;
     })().catch((error) => {
       schemaReady = null;
-      console.error('Lead database unavailable; using memory fallback:', error?.message || 'Unknown error');
-      return false;
+      console.error('Lead database unavailable:', error?.message || 'Unknown error');
+      throw new Error('Persistent database storage is unavailable.');
     });
   }
   return schemaReady;
@@ -56,7 +61,8 @@ export async function createLead(lead) {
         VALUES (${id}, ${businessId}, ${lead.industry || ''}, ${lead.name || ''}, ${lead.email || ''}, ${lead.phone || ''}, ${lead.location || ''}, ${lead.request || ''}, ${lead.preferredContact || ''}, ${record.createdAt})`;
       return record;
     } catch (error) {
-      console.error('Lead database insert failed; using memory fallback:', error?.message || 'Unknown error');
+      console.error('Lead database insert failed:', error?.message || 'Unknown error');
+      if (isProduction()) throw new Error('Persistent database storage is unavailable.');
     }
   }
 
@@ -74,7 +80,8 @@ export async function listLeads(businessId = 'demo-business') {
         FROM hamdan_leads WHERE business_id = ${businessId} ORDER BY created_at DESC LIMIT 100`;
       return rows;
     } catch (error) {
-      console.error('Lead database query failed; using memory fallback:', error?.message || 'Unknown error');
+      console.error('Lead database query failed:', error?.message || 'Unknown error');
+      if (isProduction()) throw new Error('Persistent database storage is unavailable.');
     }
   }
   return memory.get(businessId) || [];
