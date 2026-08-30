@@ -3,7 +3,7 @@ import { getBusinessConfig } from './business-store.js';
 import { rejectIfLimited } from './rate-limit.js';
 
 function cleanAssistantName(value, business) {
-  const fallback = `${business || 'the business'} AI Assistant`;
+  const fallback = 'AI Assistant for your business';
   const name = String(value || '').trim().replace(/\s+/g, ' ');
   if (!name) return fallback;
   if (/^(the\s+)?business\s+(ai|al)(\s+support)?\s+assistant$/i.test(name)) return fallback;
@@ -11,8 +11,7 @@ function cleanAssistantName(value, business) {
   return name.replace(/^the\s+the\s+/i, 'the ');
 }
 
-function localSupportAnswer(message, mode, config) {
-  const text = String(message || '').toLowerCase(); const business = config?.businessName || 'the business'; const assistant = cleanAssistantName(config?.assistantName, business);
+function localSupportAnswer(message, mode, config) { const text = String(message || '').toLowerCase(); const business = config?.businessName || 'the business'; const assistant = cleanAssistantName(config?.assistantName, business);
   if (mode === 'real-estate') { if (/schedule|showing|tour|visit/.test(text)) return `Absolutely. I can help prepare a showing request for ${business}. Please provide the property address or listing link, your preferred date and time, and the best way for an agent to contact you. A licensed agent can then confirm availability.`; if (/agent|realtor|contact|call|phone|email/.test(text)) return `I can prepare an agent handoff for ${business}. Please share your name, preferred contact method, phone or email, the area you are interested in, and when you would like an agent to contact you.`; if (/buy|house|home|property|bedroom|bathroom|budget|\$|price|rent|rental|apartment|condo|townhome/.test(text)) return 'I can help organize your property search. Please tell me the city or ZIP code, buying or renting, property type, budget, desired bedrooms/bathrooms, and your target timeframe. A licensed agent can provide current listing availability and professional advice.'; if (/sell|selling|listing|list my/.test(text)) return 'I can help prepare a seller request. Please provide the property city or ZIP code, property type, approximate size, and your preferred timeframe. A licensed real-estate professional can discuss valuation, listing strategy, and local requirements.'; return `I can help with ${assistant}'s property-search preferences, showing requests, buyer or seller lead qualification, and agent handoff. Tell me what you need and I’ll help organize the request.`; }
   if (/hello|hi|hey|good morning|good afternoon|good evening/.test(text)) return `Hello! 👋 I’m ${assistant}. How can I help you today?`; if (/shipping|delivery|deliver/.test(text)) return 'For shipping details, please provide your order number or tell me what you need to know. I can explain the available options once the company’s current policy is provided.'; if (/return|refund|exchange/.test(text)) return 'I can help with a return or refund request. Please provide your order number and a short description of the issue. A support representative should confirm the exact eligibility and deadline.'; if (/hour|open|close|support/.test(text)) return `I’m ${assistant} and I’m ready to help. For current opening hours or direct support contact, I’ll use the business information configured by the company.`; if (/thank|thanks/.test(text)) return 'You’re welcome! If you have another question, just ask. 😊'; return `I’m ${assistant}. I can help with common questions for ${business}. Ask me about the business, its services, policies, hours, or how to contact the team.`;
 }
