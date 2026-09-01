@@ -12,24 +12,108 @@ function cleanAssistantName(value, business) {
   return name.replace(/^the\s+the\s+/i, 'the ');
 }
 
-function localSupportAnswer(message, mode, config) { const text = String(message || '').toLowerCase(); const business = config?.businessName || 'Hamdan AI'; const assistant = cleanAssistantName(config?.assistantName, config);
-  if (mode === 'real-estate') { if (/schedule|showing|tour|visit/.test(text)) return `Absolutely. I can help prepare a showing request for ${business}. Please provide the property address or listing link, your preferred date and time, and the best way for an agent to contact you. A licensed agent can then confirm availability.`; if (/agent|realtor|contact|call|phone|email/.test(text)) return `I can prepare an agent handoff for ${business}. Please share your name, preferred contact method, phone or email, the area you are interested in, and when you would like an agent to contact you.`; if (/buy|house|home|property|bedroom|bathroom|budget|\$|price|rent|rental|apartment|condo|townhome/.test(text)) return 'I can help organize your property search. Please tell me the city or ZIP code, buying or renting, property type, budget, desired bedrooms/bathrooms, and your target timeframe. A licensed agent can provide current listing availability and professional advice.'; if (/sell|selling|listing|list my/.test(text)) return 'I can help prepare a seller request. Please provide the property city or ZIP code, property type, approximate size, and your preferred timeframe. A licensed real-estate professional can discuss valuation, listing strategy, and local requirements.'; return `I can help with ${assistant}'s property-search preferences, showing requests, buyer or seller lead qualification, and agent handoff. Tell me what you need and I’ll help organize the request.`; }
-  if (/hello|hi|hey|good morning|good afternoon|good evening/.test(text)) return `Hello! 👋 I’m ${assistant}. How can I help you today?`; if (/shipping|delivery|deliver/.test(text)) return 'For shipping details, please provide your order number or tell me what you need to know. I can explain the available options once the company’s current policy is provided.'; if (/return|refund|exchange/.test(text)) return 'I can help with a return or refund request. Please provide your order number and a short description of the issue. A support representative should confirm the exact eligibility and deadline.'; if (/hour|open|close|support/.test(text)) return `I’m ${assistant} and I’m ready to help. For current opening hours or direct support contact, I’ll use the business information configured by the company.`; if (/thank|thanks/.test(text)) return 'You’re welcome! If you have another question, just ask. 😊'; return `I’m ${assistant}. I can help with common questions for ${business}. Ask me about the business, its services, policies, hours, or how to contact the team.`;
+function normalizeText(value) {
+  return String(value || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
+
+function knowledgeFallback(message, config) {
+  const knowledge = String(config?.knowledge || '').trim();
+  if (!knowledge) return '';
+  const query = normalizeText(message);
+  if (!query) return '';
+  const queryWords = new Set(query.split(' ').filter((word) => word.length >= 3));
+  const candidates = knowledge.split(/(?<=[.!?])\s+|\n+/).map((part) => part.trim()).filter(Boolean).slice(0, 80);
+  let best = [];
+  for (const sentence of candidates) {
+    const words = new Set(normalizeText(sentence).split(' ').filter((word) => word.length >= 3));
+    let score = 0;
+    for (const word of queryWords) if (words.has(word)) score += 1;
+    if (score > 0) best.push({ score, sentence });
+  }
+  best.sort((a, b) => b.score - a.score);
+  const threshold = queryWords.size <= 2 ? 1 : Math.max(2, Math.ceil(queryWords.size * 0.15));
+  if (!best.length || best[0].score < threshold) return '';
+  return best.slice(0, 2).map((item) => item.sentence).join(' ').slice(0, 900);
+}
+
+function localSupportAnswer(message, mode, config) {
+  const text = normalizeText(message);
+  const business = String(config?.businessName || 'Hamdan AI').trim() || 'Hamdan AI';
+  const assistant = cleanAssistantName(config?.assistantName, config);
+  const website = String(config?.website || '').trim();
+  const email = String(config?.contactEmail || '').trim();
+  const knowledge = knowledgeFallback(message, config);
+
+  if (/\b(urdu|arabic|spanish|french|chinese|hindi)\b/.test(text) && /language|speak|support/.test(text)) {
+    return `Yes. ${assistant} can support multilingual conversations when the AI provider is connected. Tell me which language you prefer.`;
+  }
+  if (mode === 'real-estate') {
+    if (/schedule|showing|tour|visit/.test(text)) return `Absolutely. I can help prepare a showing request for ${business}. Please provide the property address or listing link, your preferred date and time, and the best way for an agent to contact you. A licensed agent can then confirm availability.`;
+    if (/agent|realtor|contact|call|phone|email/.test(text)) return `I can prepare an agent handoff for ${business}. Please share your name, preferred contact method, phone or email, the area you are interested in, and when you would like an agent to contact you.`;
+    if (/buy|house|home|property|bedroom|bathroom|budget|\$|price|rent|rental|apartment|condo|townhome/.test(text)) return 'I can help organize your property search. Please tell me the city or ZIP code, buying or renting, property type, budget, desired bedrooms/bathrooms, and your target timeframe. A licensed agent can provide current listing availability and professional advice.';
+    if (/sell|selling|listing|list my/.test(text)) return 'I can help prepare a seller request. Please provide the property city or ZIP code, property type, approximate size, and your preferred timeframe. A licensed real-estate professional can discuss valuation, listing strategy, and local requirements.';
+    if (knowledge) return knowledge;
+    return `I can help with ${assistant}'s property-search preferences, showing requests, buyer or seller lead qualification, and agent handoff. Tell me what you need and I’ll help organize the request.`;
+  }
+
+  if (/who are you|what is your name|your name|are you an ai|what can you do/.test(text)) return `Hello! 👋 I’m ${assistant}, the AI assistant for ${business}. I can answer approved business questions, explain services and policies, and help connect you with the team when needed.`;
+  if (/service|services|offer|provide/.test(text)) {
+    if (knowledge) return knowledge;
+    return `I’m ${assistant}, the AI assistant for ${business}. I can answer questions about the business, its services, policies, hours, and how to contact the team.`;
+  }
+  if (/hour|open|close|when.*open|when.*close/.test(text)) {
+    if (knowledge) return knowledge;
+    return `I can provide current opening hours when they are included in ${business}’s approved business information. I don’t want to guess or invent hours.`;
+  }
+  if (/contact|support email|email|phone|call|website|human|agent|team/.test(text)) {
+    if (email || website) {
+      const details = [email && `email: ${email}`, website && `website: ${website}`].filter(Boolean).join(' • ');
+      return `You can contact ${business} using the approved details I have: ${details}. If you want a human to follow up, ask for an agent and I can help prepare a consent-based lead request.`;
+    }
+    if (knowledge) return knowledge;
+    return `I can help you request human support from ${business}. Please ask for an agent and I’ll guide you through the next step without inventing contact details.`;
+  }
+  if (/shipping|delivery|deliver/.test(text)) return knowledge || 'For shipping details, please tell me what you need to know. I can explain the available options once the company’s current policy is provided.';
+  if (/return|refund|exchange/.test(text)) return knowledge || 'I can help with a return or refund request. Please provide your order number and a short description of the issue. A support representative should confirm the exact eligibility and deadline.';
+  if (/thank|thanks/.test(text)) return 'You’re welcome! If you have another question, just ask. 😊';
+  if (/hello|hi|hey|good morning|good afternoon|good evening/.test(text)) return `Hello! 👋 I’m ${assistant}, the AI assistant for ${business}. How can I help you today?`;
+  if (knowledge) return knowledge;
+  return `I’m ${assistant}, the AI assistant for ${business}. I can help with common questions about the business, its services, policies, hours, or how to contact the team.`;
+}
+
 function cleanMessages(messages) { return messages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })); }
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed.' }); }
   if (rejectIfLimited(req, res, 'chat', 30, 60_000)) return;
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {}; const messages = cleanMessages(Array.isArray(body.messages) ? body.messages : []); const mode = body.mode === 'real-estate' ? 'real-estate' : 'support';
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const messages = cleanMessages(Array.isArray(body.messages) ? body.messages : []);
+    const mode = body.mode === 'real-estate' ? 'real-estate' : 'support';
     if (!messages.length || messages[messages.length - 1].role !== 'user') return res.status(400).json({ error: 'A user message is required.' });
-    const businessId = getPublicBusinessId(req) || 'demo-business'; const config = await getBusinessConfig(businessId); const latest = messages[messages.length - 1].content; const apiKey = process.env.OPENAI_API_KEY;
+    const businessId = getPublicBusinessId(req) || 'demo-business';
+    const config = await getBusinessConfig(businessId);
+    const latest = messages[messages.length - 1].content;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || !apiKey.trim()) return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
     const assistant = cleanAssistantName(config?.assistantName, config);
     const businessContext = config ? `Approved business information:\nBusiness name: ${config.businessName || ''}\nAssistant name: ${assistant}\nIndustry: ${config.industry || ''}\nWebsite: ${config.website || ''}\nKnowledge supplied by the business:\n${(config.knowledge || '').slice(0,12000)}` : 'No business-specific information has been configured. Do not invent business facts.';
     const instructions = mode === 'real-estate' ? `You are ${assistant}, a professional website assistant for ${config?.businessName || 'Hamdan AI'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}` : `You are ${assistant}, the customer-support assistant for ${config?.businessName || 'Hamdan AI'}. Give concise, friendly, useful answers. When the customer asks who you are or what your name is, explicitly identify yourself as ${assistant}. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a question, say so and offer human contact/lead handoff. Respond in the same language as the user whenever possible.\n\n${businessContext}`;
-    const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim(); const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 600 }) }); const data = await response.json().catch(() => ({}));
-    if (response.ok) { const answer = data.output_text || data.output?.filter((x) => x.type === 'message').flatMap((x) => x.content || []).filter((x) => x.type === 'output_text').map((x) => x.text).join(' ').trim(); if (answer) return res.status(200).json({ answer, provider: 'openai' }); }
-    console.error('OpenAI unavailable; using local fallback', { status: response.status, error: data?.error?.message || 'unknown' }); return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
-  } catch (error) { console.error('Chat handler exception; using local fallback:', error?.message || 'Unknown error'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const mode = body.mode === 'real-estate' ? 'real-estate' : 'support'; const messages = Array.isArray(body.messages) ? body.messages : []; const latest = messages.filter((m) => m && m.role === 'user' && typeof m.content === 'string').slice(-1)[0]?.content || ''; return res.status(200).json({ answer: localSupportAnswer(latest, mode, null), provider: 'local-fallback', degraded: true }); }
+    const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
+    const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 600 }) });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const answer = data.output_text || data.output?.filter((x) => x.type === 'message').flatMap((x) => x.content || []).filter((x) => x.type === 'output_text').map((x) => x.text).join(' ').trim();
+      if (answer) return res.status(200).json({ answer, provider: 'openai' });
+    }
+    console.error('OpenAI unavailable; using local fallback', { status: response.status, error: data?.error?.message || 'unknown' });
+    return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
+  } catch (error) {
+    console.error('Chat handler exception; using local fallback:', error?.message || 'Unknown error');
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const mode = body.mode === 'real-estate' ? 'real-estate' : 'support';
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const latest = messages.filter((m) => m && m.role === 'user' && typeof m.content === 'string').slice(-1)[0]?.content || '';
+    return res.status(200).json({ answer: localSupportAnswer(latest, mode, null), provider: 'local-fallback', degraded: true });
+  }
 }
