@@ -74,8 +74,6 @@ function localSupportAnswer(message, mode, config) {
     return `I can help with ${assistant}'s property-search preferences, showing requests, buyer or seller lead qualification, and agent handoff. Tell me what you need and I’ll help organize the request.`;
   }
 
-  // Handle combined questions before single-intent fallbacks so the assistant does not
-  // answer only the first part of a multi-part customer request.
   if (video && multilingual) {
     return romanUrdu
       ? `Ji haan. Main ${assistant} hoon, ${business} ka AI assistant. Main approved business questions ka jawab de sakta hoon aur multilingual support de sakta hoon. 30-second Urdu video ke liye main aap ka professional video brief tayyar karne mein madad kar sakta hoon; actual video generation tab available hogi jab Hamdan ka video engine connected ho. Aap topic, style aur audience batayein.`
@@ -89,8 +87,6 @@ function localSupportAnswer(message, mode, config) {
     return `Yes. ${assistant} can support multilingual conversations when the AI provider is connected. Tell me which language you prefer, and I’ll respond in that language when possible.`;
   }
 
-  // Give useful creative answers even when the external AI provider is unavailable.
-  // This prevents a generic support fallback from swallowing ordinary writing requests.
   if (marketing) {
     if (/five|5|five-sentence|5-sentence/.test(text)) {
       return `Hamdan AI can position itself as the creative video partner that turns a simple business idea into a polished story in minutes. Instead of selling another generic chatbot, the campaign can show real businesses moving from a written concept to a ready-to-produce video brief with multilingual support. The message can focus on speed, clarity, and international reach while keeping the brand professional and trustworthy. A strong campaign line is “Your idea, your language, your story — brought to life with Hamdan AI.” End each campaign with a simple invitation to start creating and let the customer choose the topic, style, language, and audience.`;
@@ -159,7 +155,7 @@ export default async function handler(req, res) {
     const assistant = cleanAssistantName(config?.assistantName, config);
     const businessContext = config ? `Approved business information:\nBusiness name: ${config.businessName || ''}\nAssistant name: ${assistant}\nIndustry: ${config.industry || ''}\nWebsite: ${config.website || ''}\nKnowledge supplied by the business:\n${(config.knowledge || '').slice(0,12000)}` : 'No business-specific information has been configured. Do not invent business facts.';
     const instructions = mode === 'real-estate' ? `You are ${assistant}, a professional website assistant for ${config?.businessName || 'Hamdan AI'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}` : `You are ${assistant}, the customer-support assistant for ${config?.businessName || 'Hamdan AI'}. Give concise, friendly, useful answers. When the customer asks who you are or what your name is, explicitly identify yourself as ${assistant}. If the user asks about video creation, you may help prepare a script/brief, but never claim a video was rendered unless a connected video engine actually performed the generation. Respond in the same language as the user whenever possible, including Urdu and Roman Urdu. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a business-specific question, say so and offer human contact/lead handoff.\n\n${businessContext}`;
-    const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
+    const model = (process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
     const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 700 }) });
     const data = await response.json().catch(() => ({}));
     if (response.ok) {
