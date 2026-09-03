@@ -23,7 +23,7 @@ function knowledgeFallback(message, config) {
   if (!query) return '';
   const queryWords = new Set(query.split(' ').filter((word) => word.length >= 3));
   const candidates = knowledge.split(/(?<=[.!?])\s+|\n+/).map((part) => part.trim()).filter(Boolean).slice(0, 80);
-  let best = [];
+  const best = [];
   for (const sentence of candidates) {
     const words = new Set(normalizeText(sentence).split(' ').filter((word) => word.length >= 3));
     let score = 0;
@@ -36,6 +36,14 @@ function knowledgeFallback(message, config) {
   return best.slice(0, 2).map((item) => item.sentence).join(' ').slice(0, 900);
 }
 
+function wantsVideo(text) {
+  return /video|vid(e|eo)|30\s*(second|sec|seconds)|text to video|image to video|audio to video|create.*video|generate.*video/.test(text);
+}
+
+function wantsMultilingual(text) {
+  return /urdu|roman urdu|arabic|spanish|french|chinese|hindi|language|speak|multilingual/.test(text);
+}
+
 function localSupportAnswer(message, mode, config) {
   const text = normalizeText(message);
   const business = String(config?.businessName || 'Hamdan AI').trim() || 'Hamdan AI';
@@ -43,10 +51,10 @@ function localSupportAnswer(message, mode, config) {
   const website = String(config?.website || '').trim();
   const email = String(config?.contactEmail || '').trim();
   const knowledge = knowledgeFallback(message, config);
+  const video = wantsVideo(text);
+  const multilingual = wantsMultilingual(text);
+  const romanUrdu = /\b(kya|kaise|ap|aap|mujhe|hamdan|madad|kar|sakte|sakty|hai|hain|chahiye|bana|banaye|video)\b/.test(text) && /\b(kaise|mujhe|aap|ap|chahiye|bana|banaye)\b/.test(text);
 
-  if (/\b(urdu|arabic|spanish|french|chinese|hindi)\b/.test(text) && /language|speak|support/.test(text)) {
-    return `Yes. ${assistant} can support multilingual conversations when the AI provider is connected. Tell me which language you prefer.`;
-  }
   if (mode === 'real-estate') {
     if (/schedule|showing|tour|visit/.test(text)) return `Absolutely. I can help prepare a showing request for ${business}. Please provide the property address or listing link, your preferred date and time, and the best way for an agent to contact you. A licensed agent can then confirm availability.`;
     if (/agent|realtor|contact|call|phone|email/.test(text)) return `I can prepare an agent handoff for ${business}. Please share your name, preferred contact method, phone or email, the area you are interested in, and when you would like an agent to contact you.`;
@@ -56,7 +64,25 @@ function localSupportAnswer(message, mode, config) {
     return `I can help with ${assistant}'s property-search preferences, showing requests, buyer or seller lead qualification, and agent handoff. Tell me what you need and I’ll help organize the request.`;
   }
 
-  if (/who are you|what is your name|your name|are you an ai|what can you do/.test(text)) return `Hello! 👋 I’m ${assistant}, the AI assistant for ${business}. I can answer approved business questions, explain services and policies, and help connect you with the team when needed.`;
+  // Handle combined questions before single-intent fallbacks so the assistant does not
+  // answer only the first part of a multi-part customer request.
+  if (video && multilingual) {
+    return romanUrdu
+      ? `Ji haan. Main ${assistant} hoon, ${business} ka AI assistant. Main approved business questions ka jawab de sakta hoon aur multilingual support de sakta hoon. 30-second Urdu video ke liye main aap ka professional video brief tayyar karne mein madad kar sakta hoon; actual video generation tab available hogi jab Hamdan ka video engine connected ho. Aap topic, style aur audience batayein.`
+      : `Yes. I’m ${assistant}, the AI assistant for ${business}. I can support multilingual conversations and help prepare a professional 30-second Urdu video brief. I won’t claim that a video has been generated here unless the video-generation engine is actually connected. Tell me the topic, style, and target audience.`;
+  }
+  if (video) {
+    return `I’m ${assistant}, the AI assistant for ${business}. I can help you plan a professional video, including a 30-second Urdu script, scene-by-scene brief, voice style, and visual direction. This chatbot does not claim to render the final video unless a video-generation engine is connected. Tell me the topic and style you want.`;
+  }
+  if (multilingual) {
+    if (/urdu|roman urdu/.test(text) || romanUrdu) return `Ji haan. Main ${assistant} hoon aur Urdu/Roman Urdu mein madad kar sakta hoon. Aap apna sawal Urdu ya Roman Urdu mein bhej sakte hain.`;
+    return `Yes. ${assistant} can support multilingual conversations when the AI provider is connected. Tell me which language you prefer, and I’ll respond in that language when possible.`;
+  }
+
+  if (/who are you|what is your name|your name|are you an ai|what can you do/.test(text)) {
+    const extra = /service|services|offer|provide/.test(text) ? ` I can also explain ${business}’s approved services, policies, hours, and contact options.` : '';
+    return `Hello! 👋 I’m ${assistant}, the AI assistant for ${business}. I can answer approved business questions, explain services and policies, and help connect you with the team when needed.${extra}`;
+  }
   if (/service|services|offer|provide/.test(text)) {
     if (knowledge) return knowledge;
     return `I’m ${assistant}, the AI assistant for ${business}. I can answer questions about the business, its services, policies, hours, and how to contact the team.`;
@@ -64,6 +90,10 @@ function localSupportAnswer(message, mode, config) {
   if (/hour|open|close|when.*open|when.*close/.test(text)) {
     if (knowledge) return knowledge;
     return `I can provide current opening hours when they are included in ${business}’s approved business information. I don’t want to guess or invent hours.`;
+  }
+  if (/price|pricing|cost|credit|credits|plan|subscription/.test(text)) {
+    if (knowledge) return knowledge;
+    return `I can explain ${business} pricing or credit plans when those details are included in the approved business information. I won’t invent prices or credit amounts.`;
   }
   if (/contact|support email|email|phone|call|website|human|agent|team/.test(text)) {
     if (email || website) {
@@ -81,7 +111,12 @@ function localSupportAnswer(message, mode, config) {
   return `I’m ${assistant}, the AI assistant for ${business}. I can help with common questions about the business, its services, policies, hours, or how to contact the team.`;
 }
 
-function cleanMessages(messages) { return messages.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').slice(-20).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })); }
+function cleanMessages(messages) {
+  return messages
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .slice(-20)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed.' }); }
@@ -98,9 +133,9 @@ export default async function handler(req, res) {
     if (!apiKey || !apiKey.trim()) return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
     const assistant = cleanAssistantName(config?.assistantName, config);
     const businessContext = config ? `Approved business information:\nBusiness name: ${config.businessName || ''}\nAssistant name: ${assistant}\nIndustry: ${config.industry || ''}\nWebsite: ${config.website || ''}\nKnowledge supplied by the business:\n${(config.knowledge || '').slice(0,12000)}` : 'No business-specific information has been configured. Do not invent business facts.';
-    const instructions = mode === 'real-estate' ? `You are ${assistant}, a professional website assistant for ${config?.businessName || 'Hamdan AI'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}` : `You are ${assistant}, the customer-support assistant for ${config?.businessName || 'Hamdan AI'}. Give concise, friendly, useful answers. When the customer asks who you are or what your name is, explicitly identify yourself as ${assistant}. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a question, say so and offer human contact/lead handoff. Respond in the same language as the user whenever possible.\n\n${businessContext}`;
+    const instructions = mode === 'real-estate' ? `You are ${assistant}, a professional website assistant for ${config?.businessName || 'Hamdan AI'}. Help visitors with objective property information, search preferences, showing requests, general buying and selling process questions, and lead qualification. Never invent listings, prices, availability, mortgage terms, legal advice, or agency policies. Do not steer users or make recommendations based on protected characteristics. Offer an agent handoff when professional advice is required. Keep answers concise and friendly. Respond in the same language as the user whenever possible. Use only the approved business information below for business-specific facts.\n\n${businessContext}` : `You are ${assistant}, the customer-support assistant for ${config?.businessName || 'Hamdan AI'}. Give concise, friendly, useful answers. When the customer asks who you are or what your name is, explicitly identify yourself as ${assistant}. If the user asks about video creation, you may help prepare a script/brief, but never claim a video was rendered unless a connected video engine actually performed the generation. Respond in the same language as the user whenever possible, including Urdu and Roman Urdu. Never invent company policies, prices, hours, services, contact details, or other facts. If the approved business information does not answer a business-specific question, say so and offer human contact/lead handoff.\n\n${businessContext}`;
     const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
-    const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 600 }) });
+    const response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey.trim()}` }, body: JSON.stringify({ model, instructions, input: messages, max_output_tokens: 700 }) });
     const data = await response.json().catch(() => ({}));
     if (response.ok) {
       const answer = data.output_text || data.output?.filter((x) => x.type === 'message').flatMap((x) => x.content || []).filter((x) => x.type === 'output_text').map((x) => x.text).join(' ').trim();
