@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     process.env.RESEND_API_KEY?.trim() && process.env.RESEND_FROM?.trim()
   );
   const production = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
-  const model = (process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
+  const model = (process.env.OPENAI_MODEL || 'gpt-5.6-luna').trim();
   const criticalReady = databaseConfigured && authConfigured;
 
   return res.status(production && !criticalReady ? 503 : 200).json({
