@@ -44,6 +44,14 @@ function wantsMultilingual(text) {
   return /urdu|roman urdu|arabic|spanish|french|chinese|hindi|language|speak|multilingual/.test(text);
 }
 
+function wantsMarketing(text) {
+  return /marketing|campaign|advertis|promotion|promotional|brand idea|slogan|tagline|social media post|social media campaign|marketing idea/.test(text);
+}
+
+function wantsCreativeContent(text) {
+  return /write|create|draft|generate|make|script|story|caption|post|email|headline|copy|content idea|blog|announcement/.test(text);
+}
+
 function localSupportAnswer(message, mode, config) {
   const text = normalizeText(message);
   const business = String(config?.businessName || 'Hamdan AI').trim() || 'Hamdan AI';
@@ -53,6 +61,8 @@ function localSupportAnswer(message, mode, config) {
   const knowledge = knowledgeFallback(message, config);
   const video = wantsVideo(text);
   const multilingual = wantsMultilingual(text);
+  const marketing = wantsMarketing(text);
+  const creative = wantsCreativeContent(text);
   const romanUrdu = /\b(kya|kaise|ap|aap|mujhe|hamdan|madad|kar|sakte|sakty|hai|hain|chahiye|bana|banaye|video)\b/.test(text) && /\b(kaise|mujhe|aap|ap|chahiye|bana|banaye)\b/.test(text);
 
   if (mode === 'real-estate') {
@@ -77,6 +87,21 @@ function localSupportAnswer(message, mode, config) {
   if (multilingual) {
     if (/urdu|roman urdu/.test(text) || romanUrdu) return `Ji haan. Main ${assistant} hoon aur Urdu/Roman Urdu mein madad kar sakta hoon. Aap apna sawal Urdu ya Roman Urdu mein bhej sakte hain.`;
     return `Yes. ${assistant} can support multilingual conversations when the AI provider is connected. Tell me which language you prefer, and I’ll respond in that language when possible.`;
+  }
+
+  // Give useful creative answers even when the external AI provider is unavailable.
+  // This prevents a generic support fallback from swallowing ordinary writing requests.
+  if (marketing) {
+    if (/five|5|five-sentence|5-sentence/.test(text)) {
+      return `Hamdan AI can position itself as the creative video partner that turns a simple business idea into a polished story in minutes. Instead of selling another generic chatbot, the campaign can show real businesses moving from a written concept to a ready-to-produce video brief with multilingual support. The message can focus on speed, clarity, and international reach while keeping the brand professional and trustworthy. A strong campaign line is “Your idea, your language, your story — brought to life with Hamdan AI.” End each campaign with a simple invitation to start creating and let the customer choose the topic, style, language, and audience.`;
+    }
+    return `Here’s a marketing direction for ${business}: lead with the idea that businesses can turn one simple concept into a polished, multilingual customer-facing story. Show the journey from idea to script to video brief so customers immediately understand the value. Keep the message focused on speed, professional quality, international reach, and creative control. A campaign line could be “Your idea, your language, your story — brought to life with Hamdan AI.” If you tell me the industry and target audience, I can tailor the campaign.`;
+  }
+  if (creative && /script/.test(text)) {
+    return `I can draft a professional script for ${business}. Please give me the topic, target audience, language, desired duration, and tone. If you want a 30-second video, I can structure it as: hook, problem, solution, key benefit, and call to action.`;
+  }
+  if (creative && /caption|social media post|headline|tagline|slogan/.test(text)) {
+    return `I can create customer-facing marketing copy for ${business}. Tell me the product or service, audience, platform, language, and tone, and I can draft several options while keeping business-specific claims limited to approved information.`;
   }
 
   if (/who are you|what is your name|your name|are you an ai|what can you do/.test(text)) {
