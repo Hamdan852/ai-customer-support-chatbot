@@ -23,7 +23,11 @@ A multi-purpose, embeddable AI website assistant for businesses. It supports wri
 - `HAMDAN_AUTH_SECRET` — a random secret of at least 32 characters.
 - Vercel Postgres — required for persistent business accounts, business configuration, and leads.
 - `OPENAI_API_KEY` — optional for AI model responses; without it the assistant uses a limited local fallback.
-- `OPENAI_MODEL` — optional model name; defaults to `gpt-4o-mini`.
+- `OPENAI_MODEL` — optional model name; defaults to `gpt-5.6-luna`.
+
+## OpenAI connectivity check
+
+The OpenAI diagnostic is consolidated into the existing health function to keep the deployment within Vercel Hobby's Serverless Function limit. Use `GET /api/health?check=openai` to test whether the configured OpenAI key and model are reachable. The response never exposes the API key.
 
 ## Important
 
