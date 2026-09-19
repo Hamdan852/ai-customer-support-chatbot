@@ -14,6 +14,13 @@ function cleanAssistantName(value, business) {
   return name.replace(/^the\s+the\s+/i, 'the ');
 }
 
+const APPROVED_SERVICES = [
+  'AI Customer Support Chatbots',
+  'Website Chatbots',
+  'Multilingual AI Chatbots',
+  'Real Estate AI Chatbots'
+].join('; ');
+
 function normalizeText(value) {
   return String(value || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -157,7 +164,7 @@ export default async function handler(req, res) {
     // Never let a generic services question fall through to creative/video behavior.
     // Business services must come from an explicitly approved configuration field.
     if (mode === 'support' && isServiceQuestion) {
-      const approvedServices = String(config?.services || '').trim();
+      const approvedServices = String(config?.services || APPROVED_SERVICES).trim();
       if (approvedServices) {
         const assistant = cleanAssistantName(config?.assistantName, config);
         return res.status(200).json({
