@@ -7,6 +7,8 @@ function cleanAssistantName(value, business) {
   const fallback = businessName ? `${businessName} AI Assistant` : 'Hamdan AI Assistant';
   const name = String(value || '').trim().replace(/\s+/g, ' ');
   if (!name) return fallback;
+  // Correct the recurring "Al Assistant" typo for the Hamdan AI demo.
+  if (/^hamdan\s+al\s+assistant$/i.test(name)) return 'Hamdan AI Assistant';
   if (/^(the\s+)?business\s+(ai|al)(\s+support)?\s+assistant$/i.test(name)) return fallback;
   if (/^(the\s+)?ai\s+assistant\s+for\s+(your|the)\s+business$/i.test(name)) return fallback;
   return name.replace(/^the\s+the\s+/i, 'the ');
@@ -150,6 +152,25 @@ export default async function handler(req, res) {
     const businessId = getPublicBusinessId(req) || 'demo-business';
     const config = await getBusinessConfig(businessId);
     const latest = messages[messages.length - 1].content;
+    const normalizedLatest = normalizeText(latest);
+    const isServiceQuestion = /\b(what|which|tell me about)\b.*\bservices?\b|\bservices?\b.*\b(provide|offer|do you|available)\b/.test(normalizedLatest);
+    // Never let a generic services question fall through to creative/video behavior.
+    // Business services must come from an explicitly approved configuration field.
+    if (mode === 'support' && isServiceQuestion) {
+      const approvedServices = String(config?.services || '').trim();
+      if (approvedServices) {
+        const assistant = cleanAssistantName(config?.assistantName, config);
+        return res.status(200).json({
+          answer: `I’m ${assistant}, the AI assistant for ${config?.businessName || 'Hamdan AI'}. Our approved services include: ${approvedServices}`,
+          provider: 'business-config'
+        });
+      }
+      return res.status(200).json({
+        answer: `I’m ${cleanAssistantName(config?.assistantName, config)}, the AI assistant for ${config?.businessName || 'Hamdan AI'}. I don’t have an approved service list configured yet, so I don’t want to guess or invent services. Please ask about a specific service or contact the team for the current list.`,
+        provider: 'business-config',
+        degraded: true
+      });
+    }
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey || !apiKey.trim()) return res.status(200).json({ answer: localSupportAnswer(latest, mode, config), provider: 'local-fallback', degraded: true });
     const assistant = cleanAssistantName(config?.assistantName, config);
